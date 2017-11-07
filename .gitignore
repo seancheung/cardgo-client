@@ -57,3 +57,9 @@ typings/
 # dotenv environment variables file
 .env
 
+# OSX
+.DS_Store
+
+# Cordova
+platforms/
+plugins/

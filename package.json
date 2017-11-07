@@ -1,0 +1,62 @@
+{
+  "name": "cardgo-client",
+  "displayName": "CardGo",
+  "version": "0.1.0",
+  "description": "Client side for CardGo, the card game platform.",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "webpack && cordova serve",
+    "build": "webpack && cordova-hcp build",
+    "android": "webpack && cordova-hcp build && cordova run android",
+    "hcp": "cordova-hcp",
+    "serve": "http-server ./www -c-1"
+  },
+  "author": "Sean Cheung",
+  "license": "MIT",
+  "repository": {
+    "url": "https://github.com/seancheung/cardgo-client.git"
+  },
+  "keywords": [
+    "card",
+    "board",
+    "game",
+    "online",
+    "multiplayer",
+    "pixi",
+    "html5",
+    "canvas",
+    "webgl"
+  ],
+  "dependencies": {
+    "cordova-android": "^6.3.0",
+    "cordova-hot-code-push-plugin": "^1.5.3",
+    "cordova-ios": "^4.5.3",
+    "cordova-plugin-whitelist": "^1.3.2"
+  },
+  "cordova": {
+    "plugins": {
+      "cordova-plugin-whitelist": {},
+      "cordova-hot-code-push-plugin": {}
+    },
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.1",
+    "bluebird": "^3.5.1",
+    "clean-webpack-plugin": "^0.1.17",
+    "cordova-hot-code-push-cli": "^1.1.1",
+    "file-loader": "^1.1.5",
+    "howler": "^2.0.5",
+    "html-webpack-plugin": "^2.30.1",
+    "http-server": "^0.10.0",
+    "pixi.js": "^4.6.0",
+    "socket.io-client": "^2.0.4",
+    "uglifyjs-webpack-plugin": "^1.0.1",
+    "webpack": "^3.8.1"
+  }
+}
