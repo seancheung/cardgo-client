@@ -165,4 +165,22 @@ export default class Scene extends EventEmitter {
         }
     }
 
+    *fadein() {
+        if (this.root) {
+            while (this.root.alpha < 1) {
+                this.root.alpha += this.manager.ticker.deltaTime;
+                yield;
+            }
+        }
+    }
+
+    *fadeout() {
+        if (this.root) {
+            while (this.root.alpha > 0) {
+                this.root.alpha -= this.manager.ticker.deltaTime;
+                yield;
+            }
+        }
+    }
+
 }

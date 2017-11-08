@@ -17,7 +17,7 @@ export class SceneLoader {
     enable() {
         if (this._handler) {
             this._handler();
-            this._handler = null;
+            delete this._handler;
         }
     }
 
@@ -37,13 +37,11 @@ export default class SceneManager {
         this.ticker = ticker;
         this.stage = stage;
         this.scenes = [];
-        this._active = [];
-        this._current = null;
     }
 
     /**
      * Scene count
-     * 
+     *
      * @readonly
      * @memberof SceneManager
      */
@@ -52,18 +50,14 @@ export default class SceneManager {
     }
 
     /**
-     * Current active scene
+     * Loaded scenes
      *
+     * @type {Scene[]}
+     * @readonly
      * @memberof SceneManager
      */
-    get current() {
-        return this._current;
-    }
-
-    set current(value) {
-        if (this._current !== value && this._active.indexOf(value) >= 0) {
-            this._current = value;
-        }
+    get loaded() {
+        return this.scenes.filter(scene => scene.state >= STATE.LOADED);
     }
 
     /**
@@ -89,21 +83,10 @@ export default class SceneManager {
     }
 
     /**
-     * Go to scene
+     * Load scene
      *
      * @param {Scene|string|number} scene
-     * @returns {Promise<SceneLoader>}
-     * @memberof SceneManager
-     */
-    goto(scene) {
-        return this.load(scene, { mode: MODE.SINGLE });
-    }
-
-    /**
-     * Load scene
-     * 
-     * @param {Scene|string|number} scene
-     * @param {{mode?: number, enable?: boolean, active?: boolean}} [options]
+     * @param {{mode?: number, enable?: boolean}} [options]
      * @returns {Promise<SceneLoader>}
      * @memberof SceneManager
      */
@@ -125,14 +108,11 @@ export default class SceneManager {
         if (!options) {
             options = {};
         }
-        if (options.enable === undefined) {
-            options.enable = true;
-        }
-        if (options.active === undefined) {
-            options.active = true;
-        }
         if (options.mode === undefined) {
             options.mode = MODE.SINGLE;
+        }
+        if (options.enable === undefined) {
+            options.enable = true;
         }
         if (options.mode === MODE.SINGLE) {
             return Coroutine.promisify(
@@ -140,28 +120,24 @@ export default class SceneManager {
             )
                 .then(() => {
                     if (options.enable) {
-                        return this.unload();
+                        return Promise.map(
+                            this.loaded.filter(s => s != scene),
+                            s => Coroutine.promisify(s.unload())
+                        );
                     }
                 })
                 .then(() => {
                     if (options.enable) {
-                        this._active.push(scene);
-                        if (options.active) {
-                            this._current = scene;
-                        }
-
                         return new SceneLoader();
                     }
 
                     return new SceneLoader(() => {
-                        Coroutine.promisify(scene.load(this))
-                            .then(() => this.unload())
-                            .then(() => {
-                                this._active.push(scene);
-                                if (options.active) {
-                                    this._current = scene;
-                                }
-                            });
+                        Coroutine.promisify(scene.load(this)).then(() =>
+                            Promise.map(
+                                this.loaded.filter(s => s != scene),
+                                s => Coroutine.promisify(s.unload())
+                            )
+                        );
                     });
                 });
         } else if (options.mode === MODE.ADDTIVE) {
@@ -169,21 +145,11 @@ export default class SceneManager {
                 scene.load(this, { enable: options.enable })
             ).then(() => {
                 if (options.enable) {
-                    this._active.push(scene);
-                    if (options.active) {
-                        this._current = scene;
-                    }
-
                     return new SceneLoader();
                 }
 
                 return new SceneLoader(() => {
-                    Coroutine.promisify(scene.load(this)).then(() => {
-                        this._active.push(scene);
-                        if (options.active) {
-                            this._current = scene;
-                        }
-                    });
+                    Coroutine.promisify(scene.load(this));
                 });
             });
         }
@@ -194,16 +160,11 @@ export default class SceneManager {
     /**
      * Unload an active scene. If no scene passed in, all active scenes will be unloaded
      *
-     * @param {string|number} [scene]
+     * @param {Scene|string|number} scene
      * @returns {Promise<void>}
      * @memberof SceneManager
      */
     unload(scene) {
-        if (scene === undefined) {
-            return Promise.map(this._active, scene =>
-                Coroutine.promisify(scene.unload())
-            ).then(() => this._active.splice(0));
-        }
         if (typeof scene === 'number') {
             scene = this.getByIndex(scene);
         } else if (typeof scene === 'string') {
@@ -215,14 +176,8 @@ export default class SceneManager {
         if (scene.state < STATE.LOADED) {
             return Promise.reject(new Error('scene not loaded'));
         }
-        const index = this._active.indexOf(scene);
-        if (index > 0) {
-            return Coroutine.promisify(scene.unload()).then(() =>
-                this._active.splice(index, 1)
-            );
-        }
 
-        return Promise.resolve();
+        return Coroutine.promisify(scene.unload());
     }
 
     /**
@@ -244,32 +199,25 @@ export default class SceneManager {
     }
 
     /**
-     * Create an empty scene and add to the manager
-     * 
-     * @param {any} name
-     * @param {any} index
-     * @returns {Scene}
-     * @memberof SceneManager
-     */
-    create(name, index) {
-        const scene = new Scene(name);
-        this.add(scene, index);
-
-        return scene;
-    }
-
-    /**
-     * Merge source scene into target scene
+     * Remove scene
      *
-     * @param {Scene} src
-     * @param {Scene} dest
-     * @returns {Scene}
+     * @param {Scene|string|number} scene
      * @memberof SceneManager
      */
-    merge(src, dest) {
-        src.root.children.forEach(child => child.setParent(dest.root));
-
-        return dest;
+    remove(scene) {
+        if (typeof scene === 'number') {
+            scene = this.getByIndex(scene);
+        } else if (typeof scene === 'string') {
+            scene = this.getByName(scene);
+        }
+        if (!(scene instanceof Scene)) {
+            return Promise.reject(new Error('scene not found or not valid'));
+        }
+        const index = this.scenes.indexOf(scene);
+        if (index < 0) {
+            return Promise.reject(new Error('scene not added'));
+        }
+        this.scenes.splice(index, 1);
     }
 
 }

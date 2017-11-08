@@ -1,22 +1,6 @@
-import * as PIXI from 'pixi.js';
 import * as Promise from 'bluebird';
 
 const iterators = {};
-const ticker = new PIXI.ticker.Ticker();
-ticker.add(iterate);
-ticker.start();
-
-function iterate() {
-    Object.keys(iterators).forEach(id => {
-        const iterator = iterators[id];
-        if (iterator) {
-            const res = iterator.next();
-            if (res.done) {
-                delete iterators[id];
-            }
-        }
-    });
-}
 
 export default class Coroutine {
 
@@ -31,6 +15,10 @@ export default class Coroutine {
         }
         this._iterator = iterator;
         this._paused = false;
+    }
+
+    static get iterators() {
+        return iterators;
     }
 
     /**
@@ -104,7 +92,7 @@ export default class Coroutine {
             );
         }
         const id = Date.now();
-        iterators[id] = this[Symbol.iterator]();
+        Coroutine.iterators[id] = this[Symbol.iterator]();
 
         return id;
     }
@@ -221,17 +209,6 @@ export default class Coroutine {
     }
 
     /**
-     * Get the global ticker
-     *
-     * @readonly
-     * @static
-     * @memberof Coroutine
-     */
-    static get ticker() {
-        return ticker;
-    }
-
-    /**
     * Start a new coroutine
     *
     * @static
@@ -250,8 +227,8 @@ export default class Coroutine {
      * @memberof Coroutine
      */
     static stop(id) {
-        if (id && iterators[id]) {
-            iterators[id].throw(new CancellationError());
+        if (id && Coroutine.iterators[id]) {
+            Coroutine.iterators[id].throw(new CancellationError());
         }
     }
 
@@ -296,6 +273,18 @@ export default class Coroutine {
                     .done(resolve)
                     .catch(reject)
                     .start();
+            }
+        });
+    }
+
+    static tick() {
+        Object.keys(this.iterators).forEach(id => {
+            const iterator = this.iterators[id];
+            if (iterator) {
+                const res = iterator.next();
+                if (res.done) {
+                    delete this.iterators[id];
+                }
             }
         });
     }
